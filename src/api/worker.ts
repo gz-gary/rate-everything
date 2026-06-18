@@ -201,19 +201,13 @@ export default {
     }
 
     // ── Static assets / SPA ──
-    // 生产环境：ASSETS binding 由 Cloudflare 自动注入，直接可用
-    // 本地 dev：wrangler 直接托管静态文件，不会走到这里（只对非静态路径会进 Worker）
-    if (env.ASSETS) {
-      const response = await env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(request);
 
-      // SPA fallback: 对 /settings, /profile 等客户端路由，返回 index.html
-      if (response.status === 404) {
-        return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
-      }
-
-      return response;
+    // SPA fallback: 客户端路由（如 /settings）不存在时返回 index.html
+    if (response.status === 404) {
+      return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
     }
 
-    return json({ error: 'Not found' }, 404);
+    return response;
   },
 };
