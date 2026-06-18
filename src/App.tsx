@@ -11,7 +11,6 @@ import {
   Tag,
   List,
   Avatar,
-  theme,
   ConfigProvider,
 } from 'antd'
 import {
