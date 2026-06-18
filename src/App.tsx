@@ -189,7 +189,7 @@ function App() {
       width: 180,
       render: (date: string) => (
         <Text type="secondary">
-          {new Date(date + 'Z').toLocaleDateString('zh-CN', {
+          {new Date(date).toLocaleDateString('zh-CN', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
@@ -404,7 +404,7 @@ function FooterStyle() {
     >
       <Text type="secondary">
         RateEverything ©{new Date().getFullYear()} — Built with Vite + React +
-        TypeScript + Ant Design + Cloudflare D1
+        TypeScript + Ant Design + Supabase
       </Text>
     </Footer>
   )

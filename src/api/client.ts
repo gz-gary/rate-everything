@@ -1,47 +1,68 @@
-import type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
+import { createClient } from '@supabase/supabase-js'
+import type { Rating, CreateRatingInput, UpdateRatingInput } from './types'
 
-// ---------- API client ----------
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed with status ${res.status}`);
-  }
-  // 204 No Content
-  if (res.status === 204) return undefined as T;
-  return res.json();
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables. ' +
+    'Copy .env.example to .env and fill in your Supabase project credentials.'
+  )
 }
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export const ratingsApi = {
   /** 获取所有评分 */
-  list: () => request<Rating[]>('/ratings'),
+  list: async (): Promise<Rating[]> => {
+    const { data, error } = await supabase
+      .from('ratings')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return data
+  },
 
   /** 获取单个评分 */
-  get: (id: number) => request<Rating>(`/ratings/${id}`),
+  get: async (id: number): Promise<Rating> => {
+    const { data, error } = await supabase
+      .from('ratings')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  },
 
   /** 创建评分 */
-  create: (data: CreateRatingInput) =>
-    request<{ id: number }>('/ratings', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  create: async (data: CreateRatingInput) => {
+    const { data: result, error } = await supabase
+      .from('ratings')
+      .insert(data)
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    return { id: result.id }
+  },
 
   /** 更新评分（rating 和/或 comment） */
-  update: (id: number, data: UpdateRatingInput) =>
-    request<{ success: boolean }>(`/ratings/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
+  update: async (id: number, data: UpdateRatingInput) => {
+    const { error } = await supabase
+      .from('ratings')
+      .update(data)
+      .eq('id', id)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  },
 
   /** 删除评分 */
-  delete: (id: number) =>
-    request<{ success: boolean }>(`/ratings/${id}`, {
-      method: 'DELETE',
-    }),
-};
+  delete: async (id: number) => {
+    const { error } = await supabase
+      .from('ratings')
+      .delete()
+      .eq('id', id)
+    if (error) throw new Error(error.message)
+    return { success: true }
+  },
+}

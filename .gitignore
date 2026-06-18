@@ -12,7 +12,10 @@ dist
 dist-ssr
 *.local
 
-# Cloudflare Workers (wrangler local state)
+# Environment variables
+.env
+
+# Cloudflare (legacy Workers local state — kept for cleanup)
 .wrangler
 
 # Claude Code (local settings)

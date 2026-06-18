@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.5",
+    "@supabase/supabase-js": "^2.108.2",
     "antd": "^6.4.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260617.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
@@ -29,7 +29,6 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
-    "vite-plugin-checker": "^0.14.4",
-    "wrangler": "^4.101.0"
+    "vite-plugin-checker": "^0.14.4"
   }
 }
