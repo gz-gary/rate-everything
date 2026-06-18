@@ -8,7 +8,6 @@ export interface Env {
 }
 
 import type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
-export type { Rating, CreateRatingInput, UpdateRatingInput };
 
 // ---------- Response helpers ----------
 

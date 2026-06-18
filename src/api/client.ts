@@ -1,5 +1,4 @@
 import type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
-export type { Rating, CreateRatingInput, UpdateRatingInput };
 
 // ---------- API client ----------
 

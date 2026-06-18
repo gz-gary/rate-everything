@@ -24,7 +24,8 @@ import {
   RiseOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { ratingsApi, type Rating } from './api/client'
+import { ratingsApi } from './api/client'
+import type { Rating } from './api/types'
 
 const { Header, Content, Footer } = Layout
 const { Title, Text } = Typography
