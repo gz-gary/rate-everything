@@ -1,5 +1,5 @@
-// Types imported from shared definition
-export type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
+import type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
+export type { Rating, CreateRatingInput, UpdateRatingInput };
 
 // ---------- API client ----------
 
