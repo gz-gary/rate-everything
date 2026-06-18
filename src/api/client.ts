@@ -1,25 +1,5 @@
-// ---------- Types (mirrors the Worker types) ----------
-
-export interface Rating {
-  id: number;
-  item: string;
-  category: string;
-  rating: number;
-  comment: string | null;
-  created_at: string;
-}
-
-export interface CreateRatingInput {
-  item: string;
-  rating: number; // 1–5
-  category?: string;
-  comment?: string;
-}
-
-export interface UpdateRatingInput {
-  rating?: number;
-  comment?: string;
-}
+// Types imported from shared definition
+export type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
 
 // ---------- API client ----------
 

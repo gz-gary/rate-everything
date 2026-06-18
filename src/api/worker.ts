@@ -7,27 +7,8 @@ export interface Env {
   ASSETS: Fetcher;
 }
 
-export interface Rating {
-  id: number;
-  item: string;
-  category: string;
-  rating: number;
-  comment: string | null;
-  created_at: string;
-}
-
-// 输入类型用 undefined（可选字段），与 Rating 的 null（数据库表示）解耦
-export interface CreateRatingInput {
-  item: string;
-  rating: number;   // 1–5
-  category?: string;
-  comment?: string;
-}
-
-export interface UpdateRatingInput {
-  rating?: number;   // 1–5
-  comment?: string;
-}
+import type { Rating, CreateRatingInput, UpdateRatingInput } from './types';
+export type { Rating, CreateRatingInput, UpdateRatingInput };
 
 // ---------- Response helpers ----------
 
@@ -83,7 +64,7 @@ function validateUpdate(input: unknown): input is UpdateRatingInput {
       return false;
     }
   }
-  if (obj.comment !== undefined && typeof obj.comment !== 'string') {
+  if (obj.comment !== undefined && obj.comment !== null && typeof obj.comment !== 'string') {
     return false;
   }
   return obj.rating !== undefined || obj.comment !== undefined;
@@ -134,7 +115,7 @@ const routes: Route[] = [
     }
     const { rating, comment } = raw;
     const sets: string[] = [];
-    const binds: (string | number)[] = [];
+    const binds: (string | number | null)[] = [];
     if (rating !== undefined) {
       sets.push('rating = ?');
       binds.push(rating);
