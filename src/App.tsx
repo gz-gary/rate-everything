@@ -1,65 +1,245 @@
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Layout,
   Typography,
   Card,
-  Statistic,
   Button,
   Space,
-  Row,
-  Col,
+  Table,
   Tag,
-  List,
-  Avatar,
+  Rate,
+  Modal,
+  Form,
+  Input,
+  message,
+  Skeleton,
+  Empty,
+  Result,
   ConfigProvider,
+  Flex,
 } from 'antd'
 import {
-  ArrowUpOutlined,
-  UserOutlined,
-  ShoppingCartOutlined,
-  DollarOutlined,
+  PlusOutlined,
+  DeleteOutlined,
   RiseOutlined,
-  SettingOutlined,
-  AppstoreOutlined,
-  CloudOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
+import { ratingsApi, type Rating } from './api/client'
 
 const { Header, Content, Footer } = Layout
-const { Title, Paragraph, Text } = Typography
+const { Title, Text } = Typography
+const { TextArea } = Input
 
-const features = [
-  {
-    icon: <AppstoreOutlined style={{ fontSize: 28, color: '#1677ff' }} />,
-    title: 'Project Management',
-    description: 'Organize and track your projects with ease using our intuitive dashboard.',
-  },
-  {
-    icon: <UserOutlined style={{ fontSize: 28, color: '#1677ff' }} />,
-    title: 'Team Collaboration',
-    description: 'Work together in real-time with your team members across the globe.',
-  },
-  {
-    icon: <CloudOutlined style={{ fontSize: 28, color: '#1677ff' }} />,
-    title: 'Cloud Sync',
-    description: 'Access your data anywhere, anytime with automatic cloud synchronization.',
-  },
-  {
-    icon: <SettingOutlined style={{ fontSize: 28, color: '#1677ff' }} />,
-    title: 'Customizable Workflow',
-    description: 'Tailor the platform to fit your unique workflow and business needs.',
-  },
-]
+// ---------- Star rating labels ----------
 
-const recentActivities = [
-  { user: 'Alice', action: 'completed task', target: 'Design Review', time: '2 min ago' },
-  { user: 'Bob', action: 'uploaded file', target: 'Q4 Report.pdf', time: '15 min ago' },
-  { user: 'Charlie', action: 'commented on', target: 'Homepage Redesign', time: '1 hour ago' },
-  { user: 'Diana', action: 'joined', target: 'Marketing Team', time: '3 hours ago' },
-  { user: 'Eve', action: 'deployed', target: 'v2.1.0 to production', time: '5 hours ago' },
-]
+const ratingLabels: Record<number, string> = {
+  1: 'Terrible',
+  2: 'Poor',
+  3: 'Average',
+  4: 'Good',
+  5: 'Excellent',
+}
+
+// ---------- Color mapping for categories ----------
+
+const categoryColors: Record<string, string> = {
+  Framework: 'blue',
+  Language: 'purple',
+  Tool: 'cyan',
+  'UI Library': 'geekblue',
+  Database: 'orange',
+}
+
+// ---------- Component ----------
 
 function App() {
-  const [currentYear] = useState(new Date().getFullYear())
+  const [ratings, setRatings] = useState<Rating[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [form] = Form.useForm()
+
+  // ---- Data fetching ----
+
+  // 初始加载：只在 mount 时跑一次，不设 loading=true（已经是初始值）
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await ratingsApi.list()
+        if (!cancelled) setRatings(data)
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Failed to load ratings'
+          setError(msg)
+          message.error(msg)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // 手动刷新（用户点击 Refresh 按钮）
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await ratingsApi.list()
+      setRatings(data)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load ratings'
+      setError(msg)
+      message.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // ---- Create rating ----
+
+  const handleCreate = async (values: {
+    item: string
+    category?: string
+    rating: number
+    comment?: string
+  }) => {
+    setSubmitting(true)
+    try {
+      await ratingsApi.create({
+        item: values.item,
+        category: values.category || '',
+        rating: values.rating,
+        comment: values.comment || undefined,
+      })
+      message.success(`Rated "${values.item}" successfully!`)
+      setModalOpen(false)
+      form.resetFields()
+      refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create rating'
+      message.error(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ---- Delete rating ----
+
+  const handleDelete = async (id: number, item: string) => {
+    try {
+      await ratingsApi.delete(id)
+      message.success(`Deleted "${item}"`)
+      refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete'
+      message.error(msg)
+    }
+  }
+
+  // ---- Table columns ----
+
+  const columns = [
+    {
+      title: 'Item',
+      dataIndex: 'item',
+      key: 'item',
+      width: 200,
+      render: (text: string, record: Rating) => (
+        <Flex vertical gap={4}>
+          <Text strong>{text}</Text>
+          <Tag color={categoryColors[record.category] || 'default'}>
+            {record.category || 'Uncategorized'}
+          </Tag>
+        </Flex>
+      ),
+    },
+    {
+      title: 'Rating',
+      dataIndex: 'rating',
+      key: 'rating',
+      width: 220,
+      render: (rating: number) => (
+        <Flex vertical align="center" gap={2}>
+          <Rate disabled value={rating} />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {ratingLabels[rating]}
+          </Text>
+        </Flex>
+      ),
+    },
+    {
+      title: 'Comment',
+      dataIndex: 'comment',
+      key: 'comment',
+      render: (text: string | null) =>
+        text ? (
+          <Text italic>{text}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: 'Created',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 180,
+      render: (date: string) => (
+        <Text type="secondary">
+          {new Date(date + 'Z').toLocaleDateString('zh-CN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      ),
+    },
+    {
+      title: '',
+      key: 'actions',
+      width: 80,
+      render: (_: unknown, record: Rating) => (
+        <Button
+          type="text"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => handleDelete(record.id, record.item)}
+        />
+      ),
+    },
+  ]
+
+  // ---- Render: error ----
+
+  if (error && ratings.length === 0) {
+    return (
+      <Layout style={{ minHeight: '100vh' }}>
+        <HeaderStyle />
+        <Content style={{ padding: '0 48px' }}>
+          <Result
+            status="error"
+            title="Failed to load ratings"
+            subTitle={error}
+            extra={
+              <Button
+                type="primary"
+                icon={<ReloadOutlined />}
+                onClick={refresh}
+              >
+                Retry
+              </Button>
+            }
+          />
+        </Content>
+      </Layout>
+    )
+  }
+
+  // ---- Render: main ----
 
   return (
     <ConfigProvider
@@ -71,202 +251,161 @@ function App() {
       }}
     >
       <Layout style={{ minHeight: '100vh' }}>
-        <Header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#001529',
-            padding: '0 48px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <RiseOutlined style={{ fontSize: 24, color: '#fff' }} />
-            <Title level={4} style={{ margin: 0, color: '#fff' }}>
-              RateEverything
-            </Title>
-          </div>
-          <Space size="middle">
-            <Button type="text" style={{ color: '#fff' }}>Dashboard</Button>
-            <Button type="text" style={{ color: '#fff' }}>Projects</Button>
-            <Button type="text" style={{ color: '#fff' }}>Team</Button>
-            <Button type="primary" ghost>Get Started</Button>
-          </Space>
-        </Header>
+        <HeaderStyle />
 
         <Content style={{ padding: '0 48px' }}>
-          {/* Hero Section */}
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '80px 0 48px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: 16,
-              margin: '24px 0',
-            }}
-          >
-            <Title level={1} style={{ color: '#fff', margin: 0 }}>
-              Welcome to RateEverything
-            </Title>
-            <Paragraph
-              style={{
-                color: 'rgba(255,255,255,0.85)',
-                fontSize: 18,
-                maxWidth: 600,
-                margin: '16px auto 32px',
-              }}
-            >
-              A modern platform for rating, reviewing, and discovering the best products and
-              services. Start exploring today!
-            </Paragraph>
-            <Space size="large">
-              <Button type="primary" size="large" style={{ height: 48, paddingInline: 32 }}>
-                Get Started
-              </Button>
-              <Button size="large" ghost style={{ height: 48, paddingInline: 32, color: '#fff', borderColor: '#fff' }}>
-                Learn More
-              </Button>
-            </Space>
-          </div>
-
-          {/* Statistics Cards */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 48 }}>
-            <Col xs={24} sm={12} lg={6}>
-              <Card hoverable>
-                <Statistic
-                  title="Active Users"
-                  value={12846}
-                  prefix={<UserOutlined />}
-                  suffix={
-                    <Tag color="green" style={{ marginLeft: 8 }}>
-                      <ArrowUpOutlined /> 11.2%
-                    </Tag>
-                  }
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Card hoverable>
-                <Statistic
-                  title="Total Orders"
-                  value={3824}
-                  prefix={<ShoppingCartOutlined />}
-                  suffix={
-                    <Tag color="green" style={{ marginLeft: 8 }}>
-                      <ArrowUpOutlined /> 8.5%
-                    </Tag>
-                  }
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Card hoverable>
-                <Statistic
-                  title="Revenue"
-                  value={56123}
-                  precision={2}
-                  prefix={<DollarOutlined />}
-                  suffix={
-                    <Tag color="green" style={{ marginLeft: 8 }}>
-                      <ArrowUpOutlined /> 5.8%
-                    </Tag>
-                  }
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Card hoverable>
-                <Statistic
-                  title="Growth Rate"
-                  value={23.5}
-                  precision={1}
-                  prefix={<RiseOutlined />}
-                  suffix="%"
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Features Section */}
-          <Title level={2} style={{ textAlign: 'center', marginBottom: 32 }}>
-            Key Features
-          </Title>
-          <Row gutter={[24, 24]} style={{ marginBottom: 48 }}>
-            {features.map((feature, index) => (
-              <Col xs={24} sm={12} lg={6} key={index}>
-                <Card
-                  hoverable
-                  style={{ textAlign: 'center', height: '100%' }}
+          <Card style={{ margin: '24px 0' }}>
+            <Flex justify="space-between" align="center">
+              <div>
+                <Title level={4} style={{ margin: 0 }}>
+                  All Ratings
+                </Title>
+                {!loading && (
+                  <Text type="secondary">
+                    {ratings.length} item{ratings.length !== 1 ? 's' : ''} rated
+                  </Text>
+                )}
+              </div>
+              <Space>
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={refresh}
+                  loading={loading}
                 >
-                  <div style={{ marginBottom: 16 }}>{feature.icon}</div>
-                  <Title level={4}>{feature.title}</Title>
-                  <Paragraph type="secondary">{feature.description}</Paragraph>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                  Refresh
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => setModalOpen(true)}
+                >
+                  Rate Something
+                </Button>
+              </Space>
+            </Flex>
+          </Card>
 
-          {/* Recent Activity Section */}
-          <Row gutter={24} style={{ marginBottom: 48 }}>
-            <Col xs={24} lg={16}>
-              <Card title="Recent Activity" style={{ height: '100%' }}>
-                <List
-                  dataSource={recentActivities}
-                  renderItem={(item) => (
-                    <List.Item>
-                      <List.Item.Meta
-                        avatar={
-                          <Avatar style={{ backgroundColor: '#1677ff' }}>
-                            {item.user[0]}
-                          </Avatar>
-                        }
-                        title={
-                          <Text>
-                            <Text strong>{item.user}</Text> {item.action}{' '}
-                            <Text strong>{item.target}</Text>
-                          </Text>
-                        }
-                        description={item.time}
-                      />
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} lg={8}>
-              <Card title="Quick Actions" style={{ height: '100%' }}>
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Button block type="primary" icon={<UserOutlined />}>
-                    Add New User
-                  </Button>
-                  <Button block icon={<ShoppingCartOutlined />}>
-                    Create Order
-                  </Button>
-                  <Button block icon={<DollarOutlined />}>
-                    Generate Report
-                  </Button>
-                  <Button block icon={<SettingOutlined />}>
-                    Settings
-                  </Button>
-                </Space>
-              </Card>
-            </Col>
-          </Row>
+          {/* Loading state */}
+          {loading ? (
+            <Card>
+              <Skeleton active paragraph={{ rows: 6 }} />
+            </Card>
+          ) : /* Empty state */
+          ratings.length === 0 ? (
+            <Card>
+              <Empty description="No ratings yet — be the first!" />
+            </Card>
+          ) : (
+            /* Data table */
+            <Card bodyStyle={{ padding: 0 }}>
+              <Table
+                dataSource={ratings}
+                columns={columns}
+                rowKey="id"
+                pagination={false}
+              />
+            </Card>
+          )}
         </Content>
 
-        <Footer
-          style={{
-            textAlign: 'center',
-            background: '#f5f5f5',
-            padding: '24px 48px',
+        <FooterStyle />
+
+        {/* ---- Create Modal ---- */}
+        <Modal
+          title="Rate Something"
+          open={modalOpen}
+          onCancel={() => {
+            setModalOpen(false)
+            form.resetFields()
           }}
+          footer={null}
+          destroyOnClose
         >
-          <Paragraph type="secondary" style={{ margin: 0 }}>
-            RateEverything ©{currentYear} — Built with Vite + React + TypeScript + Ant Design
-          </Paragraph>
-        </Footer>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreate}
+            initialValues={{ rating: 5 }}
+          >
+            <Form.Item
+              name="item"
+              label="Item"
+              rules={[{ required: true, message: 'Please enter the item name' }]}
+            >
+              <Input placeholder="e.g. React, VSCode, TypeScript..." />
+            </Form.Item>
+
+            <Form.Item name="category" label="Category">
+              <Input placeholder="e.g. Framework, Tool, Language..." />
+            </Form.Item>
+
+            <Form.Item
+              name="rating"
+              label="Rating"
+              rules={[{ required: true, message: 'Please select a rating' }]}
+            >
+              <Rate tooltips={Object.values(ratingLabels)} />
+            </Form.Item>
+
+            <Form.Item name="comment" label="Comment">
+              <TextArea rows={3} placeholder="What do you think?" />
+            </Form.Item>
+
+            <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+              <Space>
+                <Button onClick={() => setModalOpen(false)}>Cancel</Button>
+                <Button type="primary" htmlType="submit" loading={submitting}>
+                  Submit
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
       </Layout>
     </ConfigProvider>
+  )
+}
+
+// ---------- Extracted header / footer (avoid repetition) ----------
+
+function HeaderStyle() {
+  return (
+    <Header
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: '#001529',
+        padding: '0 48px',
+      }}
+    >
+      <Flex align="center" gap={12}>
+        <RiseOutlined style={{ fontSize: 24, color: '#fff' }} />
+        <Title level={4} style={{ margin: 0, color: '#fff' }}>
+          RateEverything
+        </Title>
+      </Flex>
+      <Button type="primary" ghost>
+        Dashboard
+      </Button>
+    </Header>
+  )
+}
+
+function FooterStyle() {
+  return (
+    <Footer
+      style={{
+        textAlign: 'center',
+        background: '#f5f5f5',
+        padding: '24px 48px',
+      }}
+    >
+      <Text type="secondary">
+        RateEverything ©{new Date().getFullYear()} — Built with Vite + React +
+        TypeScript + Ant Design + Cloudflare D1
+      </Text>
+    </Footer>
   )
 }
 

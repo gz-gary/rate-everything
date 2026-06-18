@@ -1,0 +1,11 @@
+name = "rate-everything"
+main = "src/api/worker.ts"
+compatibility_date = "2025-06-01"
+
+# 构建后的前端 SPA 静态文件
+assets = { directory = "dist" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rate-everything-db"
+database_id = "4d55f6e7-4278-45f8-9c3c-7ed1c65124ce"
