@@ -16,10 +16,18 @@ export interface Rating {
   created_at: string;
 }
 
-export type CreateRatingInput = Pick<Rating, 'item' | 'rating'> &
-  Partial<Pick<Rating, 'category' | 'comment'>>;
+// 输入类型用 undefined（可选字段），与 Rating 的 null（数据库表示）解耦
+export interface CreateRatingInput {
+  item: string;
+  rating: number;   // 1–5
+  category?: string;
+  comment?: string;
+}
 
-export type UpdateRatingInput = Partial<Pick<Rating, 'rating' | 'comment'>>;
+export interface UpdateRatingInput {
+  rating?: number;   // 1–5
+  comment?: string;
+}
 
 // ---------- Response helpers ----------
 
@@ -104,34 +112,36 @@ const routes: Route[] = [
 
   // POST /api/ratings — create
   route('POST', '/api/ratings', async (_params, req, env) => {
-    const body: unknown = await req.json();
-    if (!validateCreate(body)) {
+    const raw: unknown = await req.json();
+    if (!validateCreate(raw)) {
       return json({ error: 'Invalid input. item (string) and rating (1-5 integer) are required.' }, 400);
     }
+    const { item, category, rating, comment } = raw;
     const result = await env.DB
       .prepare(
         'INSERT INTO ratings (item, category, rating, comment) VALUES (?, ?, ?, ?)',
       )
-      .bind(body.item, body.category ?? '', body.rating, body.comment ?? null)
+      .bind(item, category ?? '', rating, comment ?? null)
       .run();
     return json({ id: result.meta.last_row_id }, 201);
   }),
 
   // PUT /api/ratings/:id — update
   route('PUT', '/api/ratings/:id', async (params, req, env) => {
-    const body: unknown = await req.json();
-    if (!validateUpdate(body)) {
+    const raw: unknown = await req.json();
+    if (!validateUpdate(raw)) {
       return json({ error: 'Invalid input. Provide rating (1-5) and/or comment.' }, 400);
     }
+    const { rating, comment } = raw;
     const sets: string[] = [];
     const binds: (string | number)[] = [];
-    if (body.rating !== undefined) {
+    if (rating !== undefined) {
       sets.push('rating = ?');
-      binds.push(body.rating);
+      binds.push(rating);
     }
-    if (body.comment !== undefined) {
+    if (comment !== undefined) {
       sets.push('comment = ?');
-      binds.push(body.comment);
+      binds.push(comment);
     }
     binds.push(Number(params.id));
     await env.DB
@@ -201,13 +211,17 @@ export default {
     }
 
     // ── Static assets / SPA ──
-    const response = await env.ASSETS.fetch(request);
+    // ASSETS 在生产环境自动注入；本地 dev 下 wrangler 直接托管静态文件，请求不会走到这里
+    if (env.ASSETS) {
+      const response = await env.ASSETS.fetch(request);
 
-    // SPA fallback: 客户端路由（如 /settings）不存在时返回 index.html
-    if (response.status === 404) {
-      return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
+      if (response.status === 404) {
+        return env.ASSETS.fetch(new Request(new URL('/index.html', request.url)));
+      }
+
+      return response;
     }
 
-    return response;
+    return json({ error: 'Not found' }, 404);
   },
 };
